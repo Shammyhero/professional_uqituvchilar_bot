@@ -14,26 +14,33 @@ def init_db():
             region TEXT,
             subject TEXT,
             source TEXT,
+            application_type TEXT DEFAULT 'book',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
-    # Try to add username column if it doesn't exist (for migration)
+    # Try to add missing columns if they don't exist (for migration)
     try:
         cursor.execute('ALTER TABLE applications ADD COLUMN username TEXT')
     except sqlite3.OperationalError:
         pass # Column already exists
         
+    try:
+        cursor.execute("ALTER TABLE applications ADD COLUMN application_type TEXT DEFAULT 'book'")
+    except sqlite3.OperationalError:
+        pass # Column already exists
+
+        
     conn.commit()
     conn.close()
 
-def add_application(user_id, username, full_name, phone_number, region, subject, source):
+def add_application(user_id, username, full_name, phone_number, region, subject, source, application_type='book'):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO applications (user_id, username, full_name, phone_number, region, subject, source)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (user_id, username, full_name, phone_number, region, subject, source))
+        INSERT INTO applications (user_id, username, full_name, phone_number, region, subject, source, application_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (user_id, username, full_name, phone_number, region, subject, source, application_type))
     conn.commit()
     conn.close()
 
@@ -43,7 +50,7 @@ def get_all_applications():
     # Using generic fetch to pass to pandas later
     cursor = conn.cursor()
     cursor.execute('''
-        SELECT username, full_name, phone_number, region, subject, source, created_at 
+        SELECT username, full_name, phone_number, region, subject, source, application_type, created_at 
         FROM applications 
         ORDER BY created_at DESC
     ''')

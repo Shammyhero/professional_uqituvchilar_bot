@@ -4,8 +4,9 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 import os
 
-from states import ApplicationForm
+from states import ApplicationForm, CourseApplicationForm
 from keyboards import phone_request_keyboard, region_selection_keyboard, start_application_keyboard
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import add_application
 from config import ADMIN_GROUP_ID
 
@@ -14,14 +15,13 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     welcome_text = (
-        "Ustozlar uchun yozilgan <b>“Professional o’qituvchilar”</b> nomli kitobimizga "
-        "qiziqish bildirganingizdan xursandmiz.\n\n"
-        "Ushbu kitob endilikda ustozlikka kirib kelgan barcha fan ustozlariga mos keladi "
-        "va ustozlikni umuman boshqa nuqtadan kashf qilishlariga yordam beradi.\n\n"
-        "📚 <b>Kitobni chegirma narxda buyurtma qilish uchun quyidagi tugmani bosing 👇</b>"
+        "Assalomu alaykum! <b>“Professional o’qituvchilar”</b> botiga xush kelibsiz.\n\n"
+        "Ushbu bot orqali siz ustozlar uchun mo'ljallangan kitobimizni xarid qilishingiz yoki "
+        "yangi darajaga chiqishni xohlovchi ustozlar uchun maxsus <b>kursimizga</b> ro'yxatdan o'tishingiz mumkin.\n\n"
+        "Iltimos, quyidagi bo'limlardan birini tanlang 👇"
     )
     
-    image_path = "images/image.png"
+    image_path = "images/image copy.png"
     if os.path.exists(image_path):
         photo = FSInputFile(image_path)
         await message.answer_photo(
@@ -37,7 +37,28 @@ async def cmd_start(message: Message):
             reply_markup=start_application_keyboard()
         )
 
-@router.callback_query(F.data == "start_application")
+@router.callback_query(F.data == "start_book")
+async def start_book(callback: CallbackQuery):
+    await callback.message.answer("Kitob sotuvi hozircha yopiq. Qayta ochilganda sizga xabar beramiz!")
+    await callback.answer()
+
+@router.callback_query(F.data == "start_course")
+async def start_course(callback: CallbackQuery):
+    intro_text = (
+        "Barcha fan ustozlari uchun tashkillangan <b>\"Professional o'qituvchilar\"</b> nomli kursimizga qiziqish bildirganingizdan xursandmiz. Ushbu kurs ustoz sifatida yangi darajaga chiqmoqchi bo’lgan, daromadini oshirmoqchi bo’lgan va ustozlikni umuman boshqa nuqtadan kashf qilishlariga yordam beradi.\n\n"
+        "Kursga chegirma narxda yozilish uchun quyidagi tugmani bosing👇🏻"
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Kursga ariza topshirish", callback_data="apply_course")]])
+    await callback.message.answer(intro_text, parse_mode="HTML", reply_markup=kb)
+    await callback.answer()
+
+@router.callback_query(F.data == "apply_course")
+async def apply_course(callback: CallbackQuery, state: FSMContext):
+    await callback.message.answer("👤 Ism-familyangizni kiriting")
+    await state.set_state(CourseApplicationForm.waiting_for_name)
+    await callback.answer()
+
+@router.callback_query(F.data == "apply_book_hidden")
 async def start_application(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("👤 Ism-familyangizni kiriting:")
     await state.set_state(ApplicationForm.waiting_for_name)
@@ -139,4 +160,85 @@ async def process_source(message: Message, state: FSMContext):
             print(f"Failed to send admin notification: {e}")
             
     # Clear state
+    await state.clear()
+
+
+# ==========================================
+# COURSE APPLICATION HANDLERS
+# ==========================================
+
+@router.message(CourseApplicationForm.waiting_for_name)
+async def process_course_name(message: Message, state: FSMContext):
+    await state.update_data(full_name=message.text)
+    await message.answer(
+        "📞 Telefon raqamingizni yuboring:\n"
+        "(Iltimos, pastdagi \"📱 Raqamni yuborish\" tugmasini bosing)",
+        reply_markup=phone_request_keyboard()
+    )
+    await state.set_state(CourseApplicationForm.waiting_for_phone)
+
+@router.message(CourseApplicationForm.waiting_for_phone, F.contact)
+async def process_course_phone_contact(message: Message, state: FSMContext):
+    phone_number = message.contact.phone_number
+    await state.update_data(phone_number=phone_number)
+    
+    await message.answer("📚 Qaysi fandan dars berasiz (yoki dars bermoqchisiz)?", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(CourseApplicationForm.waiting_for_subject)
+
+@router.message(CourseApplicationForm.waiting_for_phone, F.text)
+async def process_course_phone_invalid(message: Message):
+    await message.answer(
+        "❌ Noto'g'ri format.\n"
+        "Iltimos, telefon raqamingizni kiritish uchun pastdagi "
+        "<b>\"📱 Raqamni yuborish\"</b> tugmasini bosing.",
+        reply_markup=phone_request_keyboard(),
+        parse_mode="HTML"
+    )
+
+@router.message(CourseApplicationForm.waiting_for_subject)
+async def process_course_subject(message: Message, state: FSMContext):
+    await state.update_data(subject=message.text)
+    await message.answer("📢 Ustozlar uchun kursim haqida oldin eshitdingizmisiz? Ha bo’lsa qayerdan?")
+    await state.set_state(CourseApplicationForm.waiting_for_source)
+
+@router.message(CourseApplicationForm.waiting_for_source)
+async def process_course_source(message: Message, state: FSMContext):
+    await state.update_data(source=message.text)
+    data = await state.get_data()
+    
+    username_raw = message.from_user.username
+    username = f"@{username_raw}" if username_raw else "Yo'q (None)"
+    
+    add_application(
+        user_id=message.from_user.id,
+        username=username,
+        full_name=data['full_name'],
+        phone_number=data['phone_number'],
+        region="",
+        subject=data['subject'],
+        source=data['source'],
+        application_type='course'
+    )
+    
+    confirmation_text = (
+        "Kursga ariza topshirganingiz uchun rahmat! 🎉\n\n"
+        "24 soat ichida Uktamovaning shaxsan o’zlari sizga qo’ng’iroq orqali bog’lanadilar va kurs haqida to’liq informatsiya beradilar."
+    )
+    await message.answer(confirmation_text)
+    
+    if ADMIN_GROUP_ID:
+        admin_text = (
+            f"🎓 YANGI KURS ARIZASI\n\n"
+            f"👤 Ismi: {data['full_name']}\n"
+            f"🌐 Username: {username}\n"
+            f"📞 Tel: {data['phone_number']}\n"
+            f"📚 Fan: {data['subject']}\n"
+            f"📢 Manba: {data['source']}\n"
+            f"🆔 User ID: {message.from_user.id}"
+        )
+        try:
+            await message.bot.send_message(chat_id=ADMIN_GROUP_ID, text=admin_text)
+        except Exception as e:
+            print(f"Failed to send admin notification: {e}")
+            
     await state.clear()

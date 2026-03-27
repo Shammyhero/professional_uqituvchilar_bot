@@ -5,7 +5,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 def start_application_keyboard():
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📚 Kitobga ariza topshirish", callback_data="start_application")]
+            [InlineKeyboardButton(text="📚 Kitob buyurtma qilish", callback_data="start_book")],
+            [InlineKeyboardButton(text="🎓 Kursga yozilish", callback_data="start_course")]
         ]
     )
 

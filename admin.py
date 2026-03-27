@@ -14,7 +14,7 @@ async def get_chat_id(message: Message):
     """Temporary command to help find the Group ID"""
     await message.reply(f"This chat's ID is: {message.chat.id}")
 
-@admin_router.message(F.text == "/export")
+@admin_router.message(F.text == "/expalltoxl")
 async def export_data(message: Message):
     # Security check: ensure the user requesting this is in the Admin Group
     # For now, a simple check if ADMIN_GROUP_ID is set and the command is run there or by an admin
@@ -37,6 +37,7 @@ async def export_data(message: Message):
         'region': 'Viloyat',
         'subject': 'Fan',
         'source': 'Manba',
+        'application_type': 'Ariza Turi',
         'created_at': 'Vaqt'
     }, inplace=True)
     
