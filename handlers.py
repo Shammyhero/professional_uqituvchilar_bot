@@ -6,7 +6,6 @@ import os
 
 from states import ApplicationForm, CourseApplicationForm
 from keyboards import phone_request_keyboard, region_selection_keyboard, start_application_keyboard
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import add_application
 from config import ADMIN_GROUP_ID
 
@@ -38,30 +37,20 @@ async def cmd_start(message: Message):
         )
 
 @router.callback_query(F.data == "start_book")
-async def start_book(callback: CallbackQuery):
-    await callback.message.answer("Kitob sotuvi hozircha yopiq. Qayta ochilganda sizga xabar beramiz!")
+async def start_book(callback: CallbackQuery, state: FSMContext):
+    await callback.message.answer("👤 Ism-familyangizni kiriting:")
+    await state.set_state(ApplicationForm.waiting_for_name)
     await callback.answer()
 
 @router.callback_query(F.data == "start_course")
 async def start_course(callback: CallbackQuery):
-    intro_text = (
-        "Barcha fan ustozlari uchun tashkillangan <b>\"Professional o'qituvchilar\"</b> nomli kursimizga qiziqish bildirganingizdan xursandmiz. Ushbu kurs ustoz sifatida yangi darajaga chiqmoqchi bo’lgan, daromadini oshirmoqchi bo’lgan va ustozlikni umuman boshqa nuqtadan kashf qilishlariga yordam beradi.\n\n"
-        "Kursga chegirma narxda yozilish uchun quyidagi tugmani bosing👇🏻"
-    )
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Kursga ariza topshirish", callback_data="apply_course")]])
-    await callback.message.answer(intro_text, parse_mode="HTML", reply_markup=kb)
+    await callback.message.answer("Kursga yozilish hozircha yopiq. Qayta ochilganda sizga xabar beramiz!")
     await callback.answer()
 
-@router.callback_query(F.data == "apply_course")
+@router.callback_query(F.data == "apply_course_hidden")
 async def apply_course(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("👤 Ism-familyangizni kiriting")
     await state.set_state(CourseApplicationForm.waiting_for_name)
-    await callback.answer()
-
-@router.callback_query(F.data == "apply_book_hidden")
-async def start_application(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("👤 Ism-familyangizni kiriting:")
-    await state.set_state(ApplicationForm.waiting_for_name)
     await callback.answer()
 
 @router.message(ApplicationForm.waiting_for_name)
